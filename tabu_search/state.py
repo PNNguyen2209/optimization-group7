@@ -16,3 +16,6 @@ class District:
 
     def add_node(self, node):
         self.nodes.append(node)
+
+    def delete_node(self, node):
+        self.nodes.remove(node)

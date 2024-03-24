@@ -1,119 +1,93 @@
 import random
 from utils import load_data
 import networkx as nx
+from state import State, District
+import copy
 
 
-def generate_random_spanning_tree(G):
-    """
-    Generate a random spanning tree from graph G.
-    """
-    return nx.minimum_spanning_tree(G)  # Using MST as a proxy for a random spanning tree
-
-
-def choose_centers(G, k):
-    """
-    Randomly choose k centers from the graph G.
-    Typically, these centers should be the most populous nodes.
-    """
-
-    sorted_nodes = sorted(G.nodes(data=True), key=lambda x: x[1].get('population', 0), reverse=True)
-    candidate_centers = [node for node, _ in sorted_nodes[:2 * k]]
-    return random.sample(candidate_centers, k)
-
-
-def cut_edges_to_form_districts(T, centers):
-    """
-    Cut edges in the spanning tree to form k districts, each containing one center.
-    """
-    districts = {center: [center] for center in centers}  # Initialize districts with centers
-
-    # Implement the logic to cut k-1 edges and form subtrees
-    # Placeholder for the actual implementation
-    # ...
-
-    return districts
-
-
-def is_feasible_move(node, origin_district, destination_district, G):
-    """
-    Check if moving 'node' from 'origin_district' to 'destination_district' is feasible.
-    """
-    # Check adjacency to destination district (condition a)
-    if not any(neighbor in destination_district for neighbor in G[node]):
-        return False
-
-    # Check if 'node' is not a cut-node for the origin district (condition b)
-    # Placeholder for the BFS or any other logic to check connectivity
-    # ...
-
-    return True
-
-
-def update_all_boundaries(G, clusters):
-    # Iterate over all nodes in the graph
-    for node in G.nodes():
-        # Find which cluster the node belongs to
-        for cluster_id, cluster in clusters.items():
-            if node in cluster["nodes"]:
-                # Check if this node has neighbors in a different cluster
-                for neighbor in G.neighbors(node):
-                    if not any(neighbor in c["nodes"] for c in clusters.values() if c != cluster):
-                        # The node is a boundary node if it has at least one neighbor in a different cluster
-                        cluster["boundaries"].add(node)
-                break  # Stop checking once the cluster for the node is found
-
-
-def extend_cluster(G, clusters):
-    # Select a random cluster
-    random_cluster = random.choice(list(clusters.values()))
-    random.shuffle(random_cluster["nodes"])
-    for node in random_cluster["nodes"]:
+def extend_cluster(G, state):
+    # Select a random district
+    random_district = random.choice(state.districts)
+    random.shuffle(random_district.nodes)
+    for node in random_district.nodes:
         neighbors = list(G.neighbors(node))
         random.shuffle(neighbors)
         for neighbor in neighbors:
-            if neighbor not in (node for cluster in clusters.values() for node in cluster["nodes"]):
-                random_cluster["nodes"].append(neighbor)
+            if not any(neighbor in district.nodes for district in state.districts):
+                random_district.add_node(neighbor)
                 return
 
 
-def generate_initial_solution(G, k):
-    nodes = list(G.nodes())
-    random.shuffle(nodes)  # Shuffle nodes to randomly pick initial cluster centers
-
-    # Initialize clusters with k random nodes
-    clusters = {i: {"nodes": [node], "boundaries": set()} for i, node in enumerate(nodes[:k])}
-
-    # Set of nodes not yet included in any cluster
-    unassigned_nodes = set(nodes[k:])
-
-    # Repeat until all nodes have been assigned to a cluster
-    while unassigned_nodes:
-        extend_cluster(G, clusters)
-        # Update the set of unassigned nodes
-        unassigned_nodes = set(nodes) - set(node for cluster in clusters.values() for node in cluster["nodes"])
-
-    update_all_boundaries(G, clusters)
-    return clusters
+def update_all_boundaries(G, state):
+    for district in state.districts:
+        for node in district.nodes:
+            # Check if this node has neighbors in a different district
+            for neighbor in G.neighbors(node):
+                if not any(neighbor in d.nodes for d in state.districts if d != district):
+                    if node not in district.boundary:
+                        district.boundary.append(node)
 
 
-def generate_feasible_solution(G, k, clusters):
+def generate_initial_state(G, k):
+    nodes = list(G.nodes)
+    random.shuffle(nodes)  # Shuffle nodes to randomly pick initial district centers
+
+    state = State(districts=[District(nodes[i]) for i in range(k)], k=k)
+
+    # Repeat until all nodes have been assigned to a district
+    while any(node not in (n for district in state.districts for n in district.nodes) for node in nodes):
+        extend_cluster(G, state)
+
+    update_all_boundaries(G, state)
+    return state
 
 
+def is_connected(district):
+    # TODO: check if district is not cut
+    return True
 
-def local_search(G, initial_solution):
-    """
-    Perform local search to optimize the districts based on a given heuristic.
-    """
+
+def generate_new_states(G, current_state):
+    new_states = []
+
+    for origin_district_index, origin_district in enumerate(current_state.districts):
+
+        for node in origin_district.boundary:
+
+            for neighbor in G.neighbors(node):
+
+                for destination_district_index, destination_district in enumerate(current_state.districts):
+
+                    if destination_district_index != origin_district_index and neighbor in destination_district.nodes:
+
+                        new_state = copy.deepcopy(current_state)
+                        new_state.districts[origin_district_index].delete_node(node)
+                        new_state.districts[destination_district_index].add_node(node)
+
+                        # Update boundaries for the new state
+                        update_all_boundaries(G, new_state)
+
+                        # new_states.append(new_state)
+                        # Add the new state to the list of new states if it maintains connectivity
+                        if is_connected(new_state.districts[origin_district_index]) and is_connected(
+                                new_state.districts[destination_district_index]):
+                            new_states.append(new_state)
+    return new_states
+
+
+def tabu_search(G, initial_solution):
+    # TODO: Implement pseudocode
     current_solution = initial_solution
-    # Placeholder for the local search algorithm implementation
-    # Consider using descent, tabu search, simulated annealing, or other heuristics
-    # ...
 
     return current_solution
 
 
 if __name__ == '__main__':
-    G, _ = load_data.load_data('data/RI')
-    initial_solution = generate_initial_solution(G, 3)
-    for id, cluster in initial_solution.items():
-        print(len(cluster["nodes"]))
+    G, total_population, k = load_data.load_data('data/RI')
+    if not nx.is_connected(G):
+        # If the graph is not connected, consider the largest connected component.
+        G = G.subgraph(max(nx.connected_components(G), key=len))
+
+    initial_state = generate_initial_state(G, k)
+    new_states = generate_new_states(G, initial_state)
+    print("1")
