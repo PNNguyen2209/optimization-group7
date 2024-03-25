@@ -46,18 +46,30 @@ class State:
 
 
 class District:
-    def __init__(self, first_node):
-        self.nodes = [first_node]
-        self.boundary = []
+    def __init__(self, first_node, G):
+        self.nodes = {first_node}
+        self.boundary = {first_node}
         self.cocycle = []
+        self.G = G
         self.spanning_tree = None
 
     def add_node(self, node):
-        self.nodes.append(node)
+        self.nodes.add(node)
+
+        if any(neighbor not in self.nodes for neighbor in self.G.neighbors(node)):
+            self.boundary.add(node)
+
+        for neighbor in self.G.neighbors(node):
+            if neighbor in self.nodes and all(n in self.nodes for n in self.G.neighbors(neighbor)):
+                self.boundary.discard(neighbor)
 
     def delete_node(self, node):
         self.nodes.remove(node)
         self.boundary.remove(node)
+
+        for neighbor in self.G.neighbors(node):
+            if neighbor in self.nodes and any(n not in self.nodes for n in self.G.neighbors(neighbor)):
+                self.boundary.add(neighbor)
 
     def update_spanning_tree(self, G):
         self.spanning_tree = G

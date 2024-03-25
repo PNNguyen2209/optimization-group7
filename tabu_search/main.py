@@ -7,9 +7,8 @@ import copy
 
 def extend_cluster(G, state):
     # Select a random district
-    random_district = random.choice(state.districts)
-    random.shuffle(random_district.nodes)
-    for node in random_district.nodes:
+    random_district = random.choice(list(state.districts))
+    for node in list(random_district.boundary):
         neighbors = list(G.neighbors(node))
         random.shuffle(neighbors)
         for neighbor in neighbors:
@@ -32,13 +31,13 @@ def generate_initial_state(G, k):
     nodes = list(G.nodes)
     random.shuffle(nodes)  # Shuffle nodes to randomly pick initial district centers
 
-    state = State(G=G, districts=[District(nodes[i]) for i in range(k)], k=k)
+    state = State(G=G, districts=[District(nodes[i], G) for i in range(k)], k=k)
 
     # Repeat until all nodes have been assigned to a district
     while any(node not in (n for district in state.districts for n in district.nodes) for node in nodes):
         extend_cluster(G, state)
 
-    update_all_boundaries(G, state)
+    # update_all_boundaries(G, state)
     for district in state.districts:
         is_connected(district)
     return state
@@ -77,7 +76,7 @@ def generate_new_states(G, current_state):
                         new_state.districts[destination_district_index].add_node(node)
 
                         # Update boundaries for the new state
-                        update_all_boundaries(G, new_state)
+                        # update_all_boundaries(G, new_state)
 
                         # new_states.append(new_state)
                         # Add the new state to the list of new states if it maintains connectivity
@@ -133,6 +132,6 @@ if __name__ == '__main__':
     initial_state = generate_initial_state(G, k)
     new_states = generate_new_states(G, initial_state)
 
-    best_solution = tabu_search(G, initial_state, 100, 10)
+    best_solution = tabu_search(G, initial_state, 5, 10)
     # print(new_states[0].node_distances())
     print("1")
