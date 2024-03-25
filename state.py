@@ -12,10 +12,10 @@ class State:
         self.k = len(self.districts)
 
     def fitness(self):
-        imbalance = self.population_imbalance() + 1
+        imbalance = (self.population_imbalance() + 1)
         distances = self.node_distances() + 1
         fitness = 0.5 * (1 / imbalance) + 0.5 * (1 / distances)
-        return fitness
+        return imbalance#fitness*100
 
     def population_imbalance(self):
         populations = []
@@ -40,8 +40,9 @@ class State:
 
             # Compute the average distance
             avg_distance = sum(lengths) / len(lengths)
-            avg_distances.append(avg_distance)
 
+            avg_distances.append(avg_distance)
+        #print(avg_distances)
         return sum(avg_distances) / len(avg_distances)
 
 

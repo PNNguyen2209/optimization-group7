@@ -61,15 +61,15 @@ def is_connected(district: District):
 
 def generate_random_neighbour(G, current_state):
     # Shuffle the list of districts to get random neighbouring state
-    shuffled_districts = current_state.districts.copy()
-    random.shuffle(shuffled_districts)
+    #shuffled_districts = current_state.districts.copy()
+    random.shuffle(current_state.districts)
     for origin_district_index, origin_district in enumerate(current_state.districts):
 
         for node in origin_district.boundary:
 
             for neighbor in G.neighbors(node):
 
-                for destination_district_index, destination_district in enumerate(shuffled_districts):
+                for destination_district_index, destination_district in enumerate(current_state.districts):
 
                     if destination_district_index != origin_district_index and neighbor in destination_district.nodes:
 
@@ -85,6 +85,7 @@ def generate_random_neighbour(G, current_state):
                         if is_connected(new_state.districts[origin_district_index]) and is_connected(
                                 new_state.districts[destination_district_index]):
                             return new_state
+    print("nothing was found")
 
 
 
@@ -92,7 +93,7 @@ def generate_random_neighbour(G, current_state):
 
 #iterations seem to go from 20 to 80k
 #threshold seems to be in range 10^-7 to 10^-2 depending on target objective (compactness/population etc)
-def oba_search(G, initial_solution, thresh=0.1, iterations=50):
+def oba_search(G, initial_solution, thresh=0.1, iterations=100):
     current_solution = initial_solution
     current_cost = initial_solution.fitness()
     best_solution = current_solution
@@ -100,6 +101,7 @@ def oba_search(G, initial_solution, thresh=0.1, iterations=50):
     # careful with pass by value/reference, maybe need to make copies
     for iter in range(iterations):
         new_solution = generate_random_neighbour(G,current_solution)
+        #print(new_solution.node_distances())
         new_cost = new_solution.fitness()
         delta = new_cost - current_cost
         if delta < thresh:
@@ -109,9 +111,10 @@ def oba_search(G, initial_solution, thresh=0.1, iterations=50):
                 best_solution = new_solution
                 best_cost = new_cost
             if delta < 0:
-                thresh = 1 - (iter / iterations)
+                thresh = thresh - (1 - (iter / iterations))
         else:
-            thresh = 1 + (iter / iterations)
+            thresh = thresh + (1 - (iter / iterations))
+        #print(best_cost)
 
     return best_solution
 
@@ -123,5 +126,10 @@ if __name__ == '__main__':
         G = G.subgraph(max(nx.connected_components(G), key=len))
 
     initial_state = generate_initial_state(G, k)
+    print(initial_state.fitness())
+    print(initial_state.population_imbalance())
+    print(initial_state.node_distances())
     solution = oba_search(G, initial_state)
-    print(solution)
+    print(solution.fitness())
+    print(solution.population_imbalance())
+    print(solution.node_distances())
