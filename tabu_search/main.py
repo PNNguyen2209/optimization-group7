@@ -32,19 +32,31 @@ def generate_initial_state(G, k):
     nodes = list(G.nodes)
     random.shuffle(nodes)  # Shuffle nodes to randomly pick initial district centers
 
-    state = State(districts=[District(nodes[i]) for i in range(k)], k=k)
+    state = State(G=G, districts=[District(nodes[i]) for i in range(k)], k=k)
 
     # Repeat until all nodes have been assigned to a district
     while any(node not in (n for district in state.districts for n in district.nodes) for node in nodes):
         extend_cluster(G, state)
 
     update_all_boundaries(G, state)
+    for district in state.districts:
+        is_connected(district)
     return state
 
 
-def is_connected(district):
-    # TODO: check if district is not cut
-    return True
+def is_connected(district: District):
+    """
+    Check if a subgraph of a district is connected - all nodes are reachable.
+    """
+    if district.spanning_tree is None:
+        G_dis = nx.Graph()
+        G_dis.add_nodes_from(district.nodes)
+        for node in district.nodes:
+            for neighbor in G.neighbors(node):
+                if neighbor in district.nodes:
+                    G_dis.add_edge(node, neighbor)
+        district.update_spanning_tree(G_dis)
+    return nx.is_connected(district.spanning_tree)
 
 
 def generate_new_states(G, current_state):
@@ -75,11 +87,41 @@ def generate_new_states(G, current_state):
     return new_states
 
 
-def tabu_search(G, initial_solution):
+def tabu_search(G, initial_solution, max_iterations, tabu_list_size):
     # TODO: Implement pseudocode
+    best_solution = initial_solution
     current_solution = initial_solution
+    tabu_list = []
 
-    return current_solution
+    for i in range(max_iterations):
+        print(f"Iteration {i}")
+        neighbors = generate_new_states(G, current_solution)
+        best_neighbor = None
+        best_neighbor_fitness = float('inf')
+
+        for neighbor in neighbors:
+            if neighbor not in tabu_list:
+                neighbor_fitness = neighbor.fitness()
+                if neighbor_fitness < best_neighbor_fitness:
+                    best_neighbor = neighbor
+                    best_neighbor_fitness = neighbor.fitness()
+
+        if best_neighbor is None:
+            break
+
+        # Update tabu list
+        current_solution = best_neighbor
+        tabu_list.append(best_neighbor)
+
+        if len(tabu_list) > tabu_list_size:
+            tabu_list.pop(0)
+
+        if best_neighbor.fitness() < best_solution.fitness():
+            # Update the best solution if the
+            # current neighbor is better
+            best_solution = best_neighbor
+
+    return best_solution
 
 
 if __name__ == '__main__':
@@ -90,4 +132,7 @@ if __name__ == '__main__':
 
     initial_state = generate_initial_state(G, k)
     new_states = generate_new_states(G, initial_state)
+
+    best_solution = tabu_search(G, initial_state, 100, 10)
+    # print(new_states[0].node_distances())
     print("1")
