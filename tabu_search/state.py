@@ -12,18 +12,22 @@ class State:
         self.k = len(self.districts)
 
     def fitness(self):
-        imbalance = self.population_imbalance() + 1
-        distances = self.node_distances() + 1
-        fitness = 0.5 * (1 / imbalance) + 0.5 * (1 / distances)
+        inertia_term = self.moment_of_inertia()
+        balance_term = self.population_imbalance()
+        fitness = 0.5 * (1 / (inertia_term + 1)) + 0.5 * (1 / (balance_term + 1))
         return fitness
 
     def population_imbalance(self):
         populations = []
+
         for district in self.districts:
             district_population = sum([self.G.nodes[node]['pop'] for node in district.nodes])
             populations.append(district_population)
 
-        return max(populations) - min(populations)
+        mean_population = sum(populations) / len(populations)
+        variance = sum((pop - mean_population) ** 2 for pop in populations) / len(populations)
+
+        return variance
 
     def node_distances(self):
         """
@@ -43,6 +47,14 @@ class State:
             avg_distances.append(avg_distance)
 
         return sum(avg_distances) / len(avg_distances)
+
+    def moment_of_inertia(self):
+        inertias = []
+        for district in self.districts:
+            centroid = district.calculate_centroid()
+            inertia = sum(nx.shortest_path_length(self.G, centroid, node) ** 2 for node in district.nodes)
+            inertias.append(inertia)
+        return sum(inertias) / len(inertias)
 
 
 class District:
@@ -73,3 +85,13 @@ class District:
 
     def update_spanning_tree(self, G):
         self.spanning_tree = G
+
+    def calculate_centroid(self):
+        min_distance_sum = float('inf')
+        centroid = None
+        for node in self.nodes:
+            distance_sum = sum(nx.shortest_path_length(self.G, node, other) for other in self.nodes)
+            if distance_sum < min_distance_sum:
+                min_distance_sum = distance_sum
+                centroid = node
+        return centroid

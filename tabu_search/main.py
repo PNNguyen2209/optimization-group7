@@ -3,6 +3,7 @@ from utils import load_data
 import networkx as nx
 from state import State, District
 import copy
+import time
 
 
 def extend_cluster(G, state):
@@ -59,6 +60,7 @@ def is_connected(district: District):
 
 
 def generate_new_states(G, current_state):
+    start = time.time()
     new_states = []
 
     for origin_district_index, origin_district in enumerate(current_state.districts):
@@ -75,35 +77,39 @@ def generate_new_states(G, current_state):
                         new_state.districts[origin_district_index].delete_node(node)
                         new_state.districts[destination_district_index].add_node(node)
 
-                        # Update boundaries for the new state
-                        # update_all_boundaries(G, new_state)
-
-                        # new_states.append(new_state)
                         # Add the new state to the list of new states if it maintains connectivity
                         if is_connected(new_state.districts[origin_district_index]) and is_connected(
                                 new_state.districts[destination_district_index]):
                             new_states.append(new_state)
+    end = time.time()
+    print(f"Time to generate all states: {end - start}")
     return new_states
 
 
 def tabu_search(G, initial_solution, max_iterations, tabu_list_size):
     # TODO: Implement pseudocode
     best_solution = initial_solution
+    best_solution_fitness = initial_solution.fitness()
     current_solution = initial_solution
     tabu_list = []
 
     for i in range(max_iterations):
         print(f"Iteration {i}")
+        start = time.time()
         neighbors = generate_new_states(G, current_solution)
         best_neighbor = None
         best_neighbor_fitness = float('inf')
 
         for neighbor in neighbors:
+            neighbor_fitness = neighbor.fitness()
+            print(f"Neighbor fitness: {neighbor_fitness}")
             if neighbor not in tabu_list:
-                neighbor_fitness = neighbor.fitness()
                 if neighbor_fitness < best_neighbor_fitness:
                     best_neighbor = neighbor
-                    best_neighbor_fitness = neighbor.fitness()
+                    best_neighbor_fitness = neighbor_fitness
+            elif neighbor_fitness < best_solution_fitness:
+                best_neighbor = neighbor
+                best_neighbor_fitness = neighbor_fitness
 
         if best_neighbor is None:
             break
@@ -115,12 +121,22 @@ def tabu_search(G, initial_solution, max_iterations, tabu_list_size):
         if len(tabu_list) > tabu_list_size:
             tabu_list.pop(0)
 
-        if best_neighbor.fitness() < best_solution.fitness():
+        if best_neighbor_fitness < best_solution_fitness:
             # Update the best solution if the
             # current neighbor is better
             best_solution = best_neighbor
+            best_solution_fitness = best_neighbor_fitness
 
+        end = time.time()
+        print(f"Time per iteration: {end - start}")
     return best_solution
+
+
+def print_solution(solution):
+    print(f"Fitness: {solution.fitness()}")
+    for district in solution.districts:
+        print(f"District: {district.nodes}")
+        print("")
 
 
 if __name__ == '__main__':
@@ -132,6 +148,7 @@ if __name__ == '__main__':
     initial_state = generate_initial_state(G, k)
     new_states = generate_new_states(G, initial_state)
 
-    best_solution = tabu_search(G, initial_state, 5, 10)
-    # print(new_states[0].node_distances())
-    print("1")
+    best_solution = tabu_search(G, initial_state, 20, 10)
+
+    print(f"Initial solution fitness: {initial_state.fitness()}")
+    print_solution(best_solution)
