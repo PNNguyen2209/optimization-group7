@@ -1,5 +1,6 @@
 import pandas as pd
 from gerrychain import Graph
+import geopandas as gpd
 
 
 def read_matrix(path):
@@ -39,13 +40,32 @@ def read_population(path):
     return total_population, data
 
 
+def read_geoids(path):
+    with open(f'{path}.hash', 'r') as file:
+        data = []
+        for line in file:
+            parts = line.strip().split()
+            if len(parts) == 2:
+                identifier, population = int(parts[0]), int(parts[1])
+                data.append((identifier, population))
+            else:
+                print(f"Unexpected line format: {line}")
+    return data
+
+
 def load_data(path):
     edges, k = read_matrix(path)
     total_population, population = read_population(path)
+    geoid = read_geoids(path)
     G = Graph()
     G.add_weighted_edges_from(edges)
     for (node, pop) in population:
         G.nodes[node]['pop'] = pop
         G.nodes[node]['name'] = node
+        G.nodes[node]['GEOID20'] = geoid[node][1]
+        G.nodes[node]['DISTR'] = None
 
-    return G, total_population, k
+
+    gdf = gpd.read_file(f'{path}_tracts.shp')
+
+    return G, total_population, k, gdf

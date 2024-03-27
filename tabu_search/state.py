@@ -1,4 +1,5 @@
 import networkx as nx
+import numpy as np
 
 
 class State:
@@ -12,9 +13,10 @@ class State:
         self.k = len(self.districts)
 
     def fitness(self):
-        inertia_term = self.moment_of_inertia()
+        inertia_term = self.node_distances()
         balance_term = self.population_imbalance()
-        fitness = 0.5 * (1 / (inertia_term + 1)) + 0.5 * (1 / (balance_term + 1))
+        # fitness = 0.5 * (1 / (inertia_term + 1)) + 0.5 * (1 / (balance_term + 1))
+        fitness = 0.65 * balance_term
         return fitness
 
     def population_imbalance(self):
@@ -24,8 +26,7 @@ class State:
             district_population = sum([self.G.nodes[node]['pop'] for node in district.nodes])
             populations.append(district_population)
 
-        mean_population = sum(populations) / len(populations)
-        variance = sum((pop - mean_population) ** 2 for pop in populations) / len(populations)
+        variance = np.var(populations)
 
         return variance
 
@@ -46,7 +47,9 @@ class State:
             avg_distance = sum(lengths) / len(lengths)
             avg_distances.append(avg_distance)
 
-        return sum(avg_distances) / len(avg_distances)
+        mean_distance = sum(avg_distances) / len(avg_distances)
+        variance = sum((dist - mean_distance) ** 2 for dist in avg_distances) / len(avg_distances)
+        return variance
 
     def moment_of_inertia(self):
         inertias = []
@@ -95,3 +98,14 @@ class District:
                 min_distance_sum = distance_sum
                 centroid = node
         return centroid
+
+    def calculate_population(self):
+        return sum([self.G.nodes[node]['pop'] for node in self.nodes])
+
+    def calculate_distances(self):
+        path_lengths = dict(nx.all_pairs_shortest_path_length(self.spanning_tree))
+
+        # Flatten the list of lengths to a single list containing all lengths
+        lengths = [length for target_lengths in path_lengths.values() for length in target_lengths]
+
+        return sum(lengths) / len(lengths)

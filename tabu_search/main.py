@@ -1,5 +1,5 @@
 import random
-from utils import load_data
+from utils import load_data, draw
 import networkx as nx
 from state import State, District
 import copy
@@ -102,7 +102,7 @@ def tabu_search(G, initial_solution, max_iterations, tabu_list_size):
 
         for neighbor in neighbors:
             neighbor_fitness = neighbor.fitness()
-            print(f"Neighbor fitness: {neighbor_fitness}")
+            # print(f"Neighbor fitness: {neighbor_fitness}")
             if neighbor not in tabu_list:
                 if neighbor_fitness < best_neighbor_fitness:
                     best_neighbor = neighbor
@@ -134,21 +134,24 @@ def tabu_search(G, initial_solution, max_iterations, tabu_list_size):
 
 def print_solution(solution):
     print(f"Fitness: {solution.fitness()}")
+    print("")
     for district in solution.districts:
         print(f"District: {district.nodes}")
+        print(f"Population: {district.calculate_population()}")
+        print(f"Distances: {district.calculate_distances()}")
         print("")
 
 
 if __name__ == '__main__':
-    G, total_population, k = load_data.load_data('data/RI')
+    G, total_population, k, gdf = load_data.load_data('data/AR')
     if not nx.is_connected(G):
         # If the graph is not connected, consider the largest connected component.
         G = G.subgraph(max(nx.connected_components(G), key=len))
 
+
     initial_state = generate_initial_state(G, k)
-    new_states = generate_new_states(G, initial_state)
 
-    best_solution = tabu_search(G, initial_state, 20, 10)
+    best_solution = tabu_search(G, initial_state, 100, 10)
 
-    print(f"Initial solution fitness: {initial_state.fitness()}")
     print_solution(best_solution)
+    draw.draw_map(G, k, gdf, [list(district.nodes) for district in initial_state.districts])
